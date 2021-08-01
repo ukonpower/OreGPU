@@ -1,0 +1,34 @@
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>OreGPU</title>
+</head>
+<body>
+	
+	<style>
+		*{
+			margin: 0;
+			box-sizing: border-box;
+		}
+		canvas {
+			position: relative;
+			width: 100%;
+			height: 100%;
+		}
+	</style>
+	
+	<canvas id="canvas"></canvas>
+	
+	<script src="../../build/oregpu.js"></script>
+
+	<script type="module">
+
+		let canvas = document.querySelector( '#canvas' );
+
+		let renderer = new OREGPU.Renderer( canvas );
+		
+		
+	</script>
+</body>
+</html>
