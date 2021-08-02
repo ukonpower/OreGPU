@@ -51,17 +51,22 @@ function __generator(thisArg, body) {
     }
 }
 
+var sampleVert = "\r\nstruct VertexOutput {\r\n  [[builtin(position)]] Position : vec4<f32>;\r\n  [[location(0)]] col : vec3<f32>;\r\n};\r\n\r\n[[stage(vertex)]]\r\nfn main([[builtin(vertex_index)]] VertexIndex : u32) -> VertexOutput {\r\n\tvar pos = array<vec2<f32>, 3>(\r\n\tvec2<f32>(0.0, 0.5),\r\n\tvec2<f32>(-0.5, -0.5),\r\n\tvec2<f32>(0.5, -0.5));\r\n\r\n\tvar col = array<vec3<f32>, 3>(\r\n\t\tvec3<f32>(1.0, 0.0, 0.0),\r\n\t\tvec3<f32>(0.0, 1.0, 0.0),\r\n\t\tvec3<f32>(0.0, 0.0, 1.0)\r\n\t);\r\n\r\n\tvar output: VertexOutput;\r\n\toutput.Position = vec4<f32>( pos[VertexIndex], 0.0, 1.0 );\r\n\toutput.col = col[VertexIndex];\r\n\r\n\treturn output;\r\n}\r\n";
+
+var sampleFrag = "[[stage(fragment)]]\r\nfn main([[location(0)]] col: vec3<f32>) -> [[location(0)]] vec4<f32> {\r\n\treturn vec4<f32>(col, 1.0);\r\n}";
+
 var Renderer = /** @class */ (function () {
     function Renderer(canvas) {
         this.adapter = null;
         this.device = null;
         this.context = null;
+        this.pipeline = null;
         this.canvas = canvas;
         this.init();
     }
     Renderer.prototype.init = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var _a, _b, presentationFormat;
+            var _a, _b, presentationFormat, size;
             return __generator(this, function (_c) {
                 switch (_c.label) {
                     case 0:
@@ -79,18 +84,38 @@ var Renderer = /** @class */ (function () {
                         if (this.device == null) {
                             return [2 /*return*/];
                         }
-                        this.context = this.canvas.getContext('gpupresent');
+                        this.context = this.canvas.getContext('webgpu');
                         if (this.context == null) {
                             return [2 /*return*/];
                         }
                         presentationFormat = this.context.getPreferredFormat(this.adapter);
+                        size = [
+                            this.canvas.clientWidth * window.devicePixelRatio,
+                            this.canvas.clientHeight * window.devicePixelRatio,
+                        ];
                         this.context.configure({
                             device: this.device,
-                            format: presentationFormat
+                            format: presentationFormat,
+                            size: size
                         });
-                        this.device.createRenderPipeline({
-                            vertex: {},
-                            fragment: {},
+                        this.pipeline = this.device.createRenderPipeline({
+                            vertex: {
+                                module: this.device.createShaderModule({
+                                    code: sampleVert
+                                }),
+                                entryPoint: 'main'
+                            },
+                            fragment: {
+                                module: this.device.createShaderModule({
+                                    code: sampleFrag
+                                }),
+                                entryPoint: 'main',
+                                targets: [
+                                    {
+                                        format: presentationFormat
+                                    }
+                                ]
+                            },
                             primitive: {
                                 topology: "triangle-list"
                             }
@@ -102,6 +127,27 @@ var Renderer = /** @class */ (function () {
         });
     };
     Renderer.prototype.render = function () {
+        if (!(this.context && this.device && this.adapter)) {
+            return;
+        }
+        var commandEncoder = this.device.createCommandEncoder();
+        var textureView = this.context.getCurrentTexture().createView();
+        var renderPassDescripter = {
+            colorAttachments: [
+                {
+                    view: textureView,
+                    loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                    storeOp: 'store',
+                },
+            ]
+        };
+        var passEncoder = commandEncoder.beginRenderPass(renderPassDescripter);
+        if (this.pipeline) {
+            passEncoder.setPipeline(this.pipeline);
+            passEncoder.draw(3, 1, 0, 0);
+            passEncoder.endPass();
+            this.device.queue.submit([commandEncoder.finish()]);
+        }
         requestAnimationFrame(this.render.bind(this));
     };
     return Renderer;

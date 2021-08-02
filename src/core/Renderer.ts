@@ -1,5 +1,7 @@
 import sampleVert from './shaders/sample.vert.wgsl';
 import sampleFrag from './shaders/sample.frag.wgsl';
+import { Mat4 } from '../math/Mat4';
+import { Vec3 } from '../math/Vec3';
 
 export class Renderer {
 
@@ -12,9 +14,20 @@ export class Renderer {
 
 	private pipeline: GPURenderPipeline | null = null;
 
+	private renderPassDescripter: GPURenderPassDescriptor | null = null;
+
+	private projectionMatrix: Mat4;
+	private viewMatrix: Mat4;
+
+	private verticesBuffer: GPUBuffer | null = null;
+
 	constructor( canvas: HTMLCanvasElement ) {
 
 		this.canvas = canvas;
+
+		// matrix
+		this.projectionMatrix = new Mat4().perspective( 50, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000 );
+		this.viewMatrix = new Mat4().makeTransform( new Vec3( 0.0, 0.0, - 5.0 ) );
 
 		this.init();
 
@@ -59,12 +72,45 @@ export class Renderer {
 			size: size
 		} );
 
+		// geometry
+
+		let cubeArray = new Float32Array( [
+			- 1, 1, 0, 1,
+			1, 1, 0, 1,
+			1, - 1, 0, 1,
+
+			1, - 1, 0, 1,
+			- 1, - 1, 0, 1,
+			- 1, 1, 0, 1,
+		] );
+
+		this.verticesBuffer = this.device.createBuffer( {
+			size: cubeArray.byteLength,
+			usage: GPUBufferUsage.VERTEX,
+			mappedAtCreation: true
+		} );
+
+		new Float32Array( this.verticesBuffer.getMappedRange() ).set( cubeArray );
+		this.verticesBuffer.unmap();
+
+		// renderpipeline
+
 		this.pipeline = this.device.createRenderPipeline( {
 			vertex: {
 				module: this.device.createShaderModule( {
 					code: sampleVert
 				} ),
-				entryPoint: 'main'
+				entryPoint: 'main',
+				buffers: [
+					{
+						arrayStride: 4 * 4,
+						attributes: [ {
+							shaderLocation: 0,
+							offset: 0,
+							format: 'float32x4' as GPUVertexFormat,
+						} ]
+					}
+				],
 			},
 			fragment: {
 				module: this.device.createShaderModule( {
@@ -78,8 +124,9 @@ export class Renderer {
 				]
 			},
 			primitive: {
-				topology: "triangle-list"
-			}
+				topology: "triangle-list",
+				cullMode: 'front'
+			},
 		} );
 
 		this.render();
@@ -97,7 +144,7 @@ export class Renderer {
 		let commandEncoder = this.device.createCommandEncoder();
 		let textureView = this.context.getCurrentTexture().createView();
 
-		let renderPassDescripter: GPURenderPassDescriptor = {
+		this.renderPassDescripter = {
 			colorAttachments: [
 				{
 					view: textureView,
@@ -107,12 +154,21 @@ export class Renderer {
 			]
 		};
 
-		let passEncoder = commandEncoder.beginRenderPass( renderPassDescripter );
+
+		let passEncoder = commandEncoder.beginRenderPass( this.renderPassDescripter );
 
 		if ( this.pipeline ) {
 
 			passEncoder.setPipeline( this.pipeline );
-			passEncoder.draw( 3, 1, 0, 0 );
+
+			if ( this.verticesBuffer ) {
+
+				passEncoder.setVertexBuffer( 0, this.verticesBuffer );
+
+			}
+
+			passEncoder.draw( 6, 1, 0, 0 );
+
 			passEncoder.endPass();
 
 			this.device.queue.submit(
