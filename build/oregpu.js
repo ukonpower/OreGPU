@@ -57,7 +57,7 @@
         }
     }
 
-    var sampleVert = "\r\nstruct VertexOutput {\r\n  [[builtin(position)]] Position : vec4<f32>;\r\n  [[location(0)]] col : vec3<f32>;\r\n};\r\n\r\n[[stage(vertex)]]\r\nfn main([[location(0)]] position : vec3<f32> ) -> VertexOutput {\r\n\r\n\tvar output: VertexOutput;\r\n\toutput.Position = vec4<f32>( position * 0.5, 1.0 );\r\n\toutput.col = position + vec3<f32>( 0.0, 0.0, 1.0 );\r\n\r\n\treturn output;\r\n}\r\n";
+    var sampleVert = "[[block]] struct Uniforms {\r\n  mvMatrix : mat4x4<f32>;\r\n  projectionMatrix : mat4x4<f32>;\r\n};\r\n[[binding(0), group(0)]] var<uniform> uniforms : Uniforms;\r\n\r\nstruct VertexOutput {\r\n  [[builtin(position)]] Position : vec4<f32>;\r\n  [[location(0)]] col : vec3<f32>;\r\n};\r\n\r\n[[stage(vertex)]]\r\nfn main([[location(0)]] position : vec3<f32> ) -> VertexOutput {\r\n\r\n\tvar output: VertexOutput;\r\n\r\n\tvar mvPosition: vec4<f32> = uniforms.mvMatrix * vec4<f32>( position, 1.0 );\r\n\toutput.Position = uniforms.projectionMatrix * mvPosition;\r\n\toutput.col = position + vec3<f32>( 0.0, 0.0, 1.0 );\r\n\r\n\treturn output;\r\n}\r\n";
 
     var sampleFrag = "[[stage(fragment)]]\r\nfn main([[location(0)]] col: vec3<f32>) -> [[location(0)]] vec4<f32> {\r\n\treturn vec4<f32>(col, 1.0);\r\n}";
 
@@ -312,6 +312,9 @@
             this.pipeline = null;
             this.renderPassDescripter = null;
             this.verticesBuffer = null;
+            this.uniformBuffer = null;
+            this.uniformBindGroup = null;
+            this.time = 0;
             this.canvas = canvas;
             // matrix
             this.projectionMatrix = new Mat4().perspective(50, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000);
@@ -398,8 +401,24 @@
                                 },
                                 primitive: {
                                     topology: "triangle-list",
-                                    cullMode: 'front'
+                                    cullMode: 'none'
                                 },
+                            });
+                            // uniforms
+                            this.uniformBuffer = this.device.createBuffer({
+                                size: 4 * 16 * 2,
+                                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+                            });
+                            this.uniformBindGroup = this.device.createBindGroup({
+                                layout: this.pipeline.getBindGroupLayout(0),
+                                entries: [
+                                    {
+                                        binding: 0,
+                                        resource: {
+                                            buffer: this.uniformBuffer
+                                        }
+                                    }
+                                ]
                             });
                             this.render();
                             return [2 /*return*/];
@@ -408,8 +427,16 @@
             });
         };
         Renderer.prototype.render = function () {
+            this.time += 0.16;
             if (!(this.context && this.device && this.adapter)) {
                 return;
+            }
+            // set uniforms
+            if (this.uniformBuffer) {
+                var modelMatrix = new Mat4().makeRotation(new Vec3(0.0, this.time * 0.1, 0.0));
+                var mvMatrix = this.viewMatrix.clone().multiply(modelMatrix);
+                var uniformData = new Float32Array(new Array().concat(mvMatrix.elm, this.projectionMatrix.elm));
+                this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData.buffer, uniformData.byteOffset, uniformData.byteLength);
             }
             var commandEncoder = this.device.createCommandEncoder();
             var textureView = this.context.getCurrentTexture().createView();
@@ -425,6 +452,9 @@
             var passEncoder = commandEncoder.beginRenderPass(this.renderPassDescripter);
             if (this.pipeline) {
                 passEncoder.setPipeline(this.pipeline);
+                if (this.uniformBindGroup) {
+                    passEncoder.setBindGroup(0, this.uniformBindGroup);
+                }
                 if (this.verticesBuffer) {
                     passEncoder.setVertexBuffer(0, this.verticesBuffer);
                 }

@@ -21,6 +21,11 @@ export class Renderer {
 
 	private verticesBuffer: GPUBuffer | null = null;
 
+	private uniformBuffer: GPUBuffer | null = null;
+	private uniformBindGroup: GPUBindGroup | null = null;
+
+	private time: number = 0;
+
 	constructor( canvas: HTMLCanvasElement ) {
 
 		this.canvas = canvas;
@@ -125,8 +130,27 @@ export class Renderer {
 			},
 			primitive: {
 				topology: "triangle-list",
-				cullMode: 'front'
+				cullMode: 'none'
 			},
+		} );
+
+		// uniforms
+
+		this.uniformBuffer = this.device.createBuffer( {
+			size: 4 * 16 * 2,
+			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+		} );
+
+		this.uniformBindGroup = this.device.createBindGroup( {
+			layout: this.pipeline.getBindGroupLayout( 0 ),
+			entries: [
+				{
+					binding: 0,
+					resource: {
+						buffer: this.uniformBuffer
+					}
+				}
+			]
 		} );
 
 		this.render();
@@ -135,9 +159,23 @@ export class Renderer {
 
 	private render() {
 
+		this.time += 0.16;
+
 		if ( ! ( this.context && this.device && this.adapter ) ) {
 
 			return;
+
+		}
+
+		// set uniforms
+
+		if ( this.uniformBuffer ) {
+
+			let modelMatrix = new Mat4().makeRotation( new Vec3( 0.0, this.time * 0.1, 0.0 ) );
+			let mvMatrix = this.viewMatrix.clone().multiply( modelMatrix );
+			let uniformData = new Float32Array( new Array<number>().concat( mvMatrix.elm, this.projectionMatrix.elm ) );
+
+			this.device.queue.writeBuffer( this.uniformBuffer, 0, uniformData.buffer, uniformData.byteOffset, uniformData.byteLength );
 
 		}
 
@@ -160,6 +198,12 @@ export class Renderer {
 		if ( this.pipeline ) {
 
 			passEncoder.setPipeline( this.pipeline );
+
+			if ( this.uniformBindGroup ) {
+
+				passEncoder.setBindGroup( 0, this.uniformBindGroup );
+
+			}
 
 			if ( this.verticesBuffer ) {
 
