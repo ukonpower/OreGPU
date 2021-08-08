@@ -67,19 +67,95 @@ function __generator(thisArg, body) {
     }
 }
 
-function __spreadArray(to, from, pack) {
-    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-        if (ar || !(i in from)) {
-            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-            ar[i] = from[i];
-        }
-    }
-    return to.concat(ar || from);
-}
-
 var sampleVert = "[[block]] struct Uniforms {\r\n  mvMatrix : mat4x4<f32>;\r\n  projectionMatrix : mat4x4<f32>;\r\n  normalMatrix:  mat3x3<f32>;\r\n};\r\n[[binding(0), group(0)]] var<uniform> uniforms : Uniforms;\r\n\r\nstruct VertexOutput {\r\n  [[builtin(position)]] Position : vec4<f32>;\r\n  [[location(0)]] col : vec3<f32>;\r\n  [[location(1)]] normal : vec3<f32>;\r\n};\r\n\r\n[[stage(vertex)]]\r\nfn main([[location(0)]] position : vec3<f32>, [[location(1)]] uv : vec2<f32>, [[location(2)]] normal : vec3<f32> ) -> VertexOutput {\r\n\r\n\tvar output: VertexOutput;\r\n\r\n\tvar mvPosition: vec4<f32> = uniforms.mvMatrix * vec4<f32>( position, 1.0 );\r\n\toutput.Position = uniforms.projectionMatrix * mvPosition;\r\n\toutput.col = position + vec3<f32>( 0.0, 0.0, 1.0 );\r\n\toutput.normal = normalize(normal * uniforms.normalMatrix);\r\n\r\n\treturn output;\r\n}\r\n";
 
-var sampleFrag = "[[stage(fragment)]]\r\nfn main([[location(0)]] col: vec3<f32>, [[location(1)]] normal: vec3<f32>) -> [[location(0)]] vec4<f32> {\r\n\r\n\tvar s: f32 = dot( normalize(normal), vec3<f32>( 1.0, 1.0, 1.0 ) );\r\n\tvar c: vec3<f32> = vec3<f32>( max( 0.0,s ) + 0.4);\r\n\treturn vec4<f32>((normal * 0.5 + 0.5), 1.0);\r\n}";
+var sampleFrag = "[[stage(fragment)]]\r\nfn main([[location(0)]] col: vec3<f32>, [[location(1)]] normal: vec3<f32>) -> [[location(0)]] vec4<f32> {\r\n\r\n\tvar s: f32 = dot( normalize(normal), normalize( vec3<f32>( 1.0, 1.0, 11.0  ) ) );\r\n\tvar c: vec3<f32> = vec3<f32>( max( 0.0, s ) + 0.0);\r\n\treturn vec4<f32>(c, 1.0);\r\n}";
+
+var Vec3 = /** @class */ (function () {
+    function Vec3(x, y, z) {
+        this.x = x || 0;
+        this.y = y || 0;
+        this.z = z || 0;
+    }
+    Object.defineProperty(Vec3.prototype, "isVec3", {
+        get: function () {
+            return true;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    Vec3.prototype.set = function (x, y, z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        return this;
+    };
+    Vec3.prototype.add = function (a) {
+        if (a.isVec3) {
+            this.x += a.x;
+            this.y += a.y;
+            this.z += a.z;
+        }
+        else if (typeof (a) == 'number') {
+            this.x += a;
+            this.y += a;
+            this.z += a;
+        }
+        return this;
+    };
+    Vec3.prototype.sub = function (a) {
+        if (a.isVec3) {
+            this.x -= a.x;
+            this.y -= a.y;
+            this.z -= a.z;
+        }
+        else if (typeof (a) == 'number') {
+            this.x -= a;
+            this.y -= a;
+            this.z -= a;
+        }
+        return this;
+    };
+    Vec3.prototype.multiply = function (a) {
+        this.x *= a;
+        this.y *= a;
+        this.z *= a;
+        return this;
+    };
+    Vec3.prototype.divide = function (a) {
+        this.x /= a;
+        this.y /= a;
+        this.z /= a;
+        return this;
+    };
+    Vec3.prototype.length = function () {
+        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    };
+    Vec3.prototype.normalize = function () {
+        return this.divide(this.length() || 1);
+    };
+    Vec3.prototype.cross = function (v) {
+        var ax = this.x, ay = this.y, az = this.z;
+        var bx = v.x, by = v.y, bz = v.z;
+        this.x = ay * bz - az * by;
+        this.y = az * bx - ax * bz;
+        this.z = ax * by - ay * bx;
+        return this;
+    };
+    Vec3.prototype.dot = function (v) {
+        return this.x * v.x + this.y * v.y + this.z * v.z;
+    };
+    Vec3.prototype.copy = function (a) {
+        this.x = a.x;
+        this.y = a.y;
+        this.z = a.z || 0;
+        return this;
+    };
+    Vec3.prototype.clone = function () {
+        return new Vec3(this.x, this.y, this.z);
+    };
+    return Vec3;
+}());
 
 var Mat4 = /** @class */ (function () {
     function Mat4() {
@@ -198,15 +274,9 @@ var Mat4 = /** @class */ (function () {
     };
     Mat4.prototype.makeTransform = function (position, rotation, scale) {
         this.identity();
-        if (position) {
-            this.multiply(new Mat4().makePosition(position));
-        }
-        if (rotation) {
-            this.multiply(new Mat4().makeRotation(rotation));
-        }
-        if (scale) {
-            this.multiply(new Mat4().makeScale(scale));
-        }
+        this.multiply(new Mat4().makePosition(position || new Vec3(0.0, 0.0, 0.0)));
+        this.multiply(new Mat4().makeRotation(rotation || new Vec3(0.0, 0.0, 0.0)));
+        this.multiply(new Mat4().makeScale(scale || new Vec3(1.0, 1.0, 1.0)));
         return this;
     };
     Mat4.prototype.perspective = function (fov, aspect, near, far) {
@@ -236,92 +306,6 @@ var Mat4 = /** @class */ (function () {
         return this;
     };
     return Mat4;
-}());
-
-var Vec3 = /** @class */ (function () {
-    function Vec3(x, y, z) {
-        this.x = x || 0;
-        this.y = y || 0;
-        this.z = z || 0;
-    }
-    Object.defineProperty(Vec3.prototype, "isVec3", {
-        get: function () {
-            return true;
-        },
-        enumerable: false,
-        configurable: true
-    });
-    Vec3.prototype.set = function (x, y, z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        return this;
-    };
-    Vec3.prototype.add = function (a) {
-        if (a.isVec3) {
-            this.x += a.x;
-            this.y += a.y;
-            this.z += a.z;
-        }
-        else if (typeof (a) == 'number') {
-            this.x += a;
-            this.y += a;
-            this.z += a;
-        }
-        return this;
-    };
-    Vec3.prototype.sub = function (a) {
-        if (a.isVec3) {
-            this.x -= a.x;
-            this.y -= a.y;
-            this.z -= a.z;
-        }
-        else if (typeof (a) == 'number') {
-            this.x -= a;
-            this.y -= a;
-            this.z -= a;
-        }
-        return this;
-    };
-    Vec3.prototype.multiply = function (a) {
-        this.x *= a;
-        this.y *= a;
-        this.z *= a;
-        return this;
-    };
-    Vec3.prototype.divide = function (a) {
-        this.x /= a;
-        this.y /= a;
-        this.z /= a;
-        return this;
-    };
-    Vec3.prototype.length = function () {
-        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
-    };
-    Vec3.prototype.normalize = function () {
-        return this.divide(this.length() || 1);
-    };
-    Vec3.prototype.cross = function (v) {
-        var ax = this.x, ay = this.y, az = this.z;
-        var bx = v.x, by = v.y, bz = v.z;
-        this.x = ay * bz - az * by;
-        this.y = az * bx - ax * bz;
-        this.z = ax * by - ay * bx;
-        return this;
-    };
-    Vec3.prototype.dot = function (v) {
-        return this.x * v.x + this.y * v.y + this.z * v.z;
-    };
-    Vec3.prototype.copy = function (a) {
-        this.x = a.x;
-        this.y = a.y;
-        this.z = a.z || 0;
-        return this;
-    };
-    Vec3.prototype.clone = function () {
-        return new Vec3(this.x, this.y, this.z);
-    };
-    return Vec3;
 }());
 
 var Geometry = /** @class */ (function () {
@@ -459,6 +443,7 @@ var Mat3 = /** @class */ (function () {
             b, e, h,
             c, f, i
         ];
+        return this;
     };
     Mat3.prototype.clone = function () {
         return new Mat3().copy(this);
@@ -468,7 +453,7 @@ var Mat3 = /** @class */ (function () {
             this.elm = mat.elm.slice();
         }
         if ('isMat4' in mat) {
-            this.set(mat.elm[0], mat.elm[4], mat.elm[7], mat.elm[1], mat.elm[5], mat.elm[8], mat.elm[2], mat.elm[6], mat.elm[9]);
+            this.set(mat.elm[0], mat.elm[4], mat.elm[8], mat.elm[1], mat.elm[5], mat.elm[9], mat.elm[2], mat.elm[6], mat.elm[10]);
         }
         return this;
     };
@@ -485,8 +470,7 @@ var Mat3 = /** @class */ (function () {
         var det = a11 * a22 * a33 + a12 * a23 * a31 + a13 * a21 * a32 -
             a13 * a22 * a31 - a12 * a21 * a33 - a11 * a23 * a32;
         if (det == 0) {
-            this.identity();
-            return this;
+            return this.set(0, 0, 0, 0, 0, 0, 0, 0, 0);
         }
         var detInv = 1.0 / det;
         this.elm[0] = (a22 * a33 - a23 * a32) * detInv;
@@ -501,7 +485,7 @@ var Mat3 = /** @class */ (function () {
         return this;
     };
     Mat3.prototype.transpose = function () {
-        var a = __spreadArray([], this.elm);
+        var a = this.elm.slice();
         this.elm[0] = a[0];
         this.elm[3] = a[1];
         this.elm[6] = a[2];
@@ -637,8 +621,8 @@ var Renderer = /** @class */ (function () {
         this.time = 0;
         this.canvas = canvas;
         // matrix
-        this.projectionMatrix = new Mat4().perspective(50, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000);
-        this.viewMatrix = new Mat4().makeTransform(new Vec3(0.0, 0.0, 5.0));
+        this.projectionMatrix = new Mat4().perspective(90, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000);
+        this.viewMatrix = new Mat4().lookAt(new Vec3(1.0, 1.0, 2.0), new Vec3(0, 0, 0), new Vec3(0, 1, 0));
         this.geo = new CubeGeometry();
         this.init();
     }
@@ -776,11 +760,16 @@ var Renderer = /** @class */ (function () {
         }
         // set uniforms
         if (this.uniformBuffer) {
-            var modelMatrix = new Mat4().makeRotation(new Vec3(0.0, this.time * 0.1, 0.0));
-            var mvMatrix = this.viewMatrix.clone().inverse().multiply(modelMatrix);
+            var modelMatrix = new Mat4().makeTransform(new Vec3(), new Vec3(this.time * 0.1, this.time * 0.2, 0));
+            var mvMatrix = this.viewMatrix.clone().multiply(modelMatrix);
             var normalMatrix = new Mat3().copy(mvMatrix);
             normalMatrix.inverse().transpose();
-            var uniformData = new Float32Array(new Array().concat(mvMatrix.elm, this.projectionMatrix.elm, normalMatrix.elm));
+            var e = [
+                normalMatrix.elm[0], normalMatrix.elm[3], normalMatrix.elm[6], 0,
+                normalMatrix.elm[1], normalMatrix.elm[4], normalMatrix.elm[7], 0,
+                normalMatrix.elm[2], normalMatrix.elm[5], normalMatrix.elm[8], 0,
+            ];
+            var uniformData = new Float32Array(new Array().concat(mvMatrix.elm, this.projectionMatrix.elm, e));
             this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData.buffer, uniformData.byteOffset, uniformData.byteLength);
         }
         var commandEncoder = this.device.createCommandEncoder();
@@ -880,4 +869,77 @@ var Vec2 = /** @class */ (function () {
     return Vec2;
 }());
 
-export { Mat4, Renderer, Vec2, Vec3 };
+var GLTFLoader = /** @class */ (function () {
+    function GLTFLoader() {
+    }
+    GLTFLoader.prototype.load = function (path, callBack) {
+        var _this = this;
+        var request = new XMLHttpRequest();
+        request.open('GET', path, true);
+        request.send(null);
+        request.addEventListener('load', function (e) {
+            var data = JSON.parse(request.response);
+            var uri = data.buffers[0].uri;
+            var buffer = _this.decodeURI(uri);
+            var result = {};
+            var nkey = Object.keys(data.nodes);
+            for (var i = 0; i < nkey.length; i++) {
+                var m = data.nodes[nkey[i]];
+                var pri = data.meshes[m.mesh].primitives[0];
+                var attrs = {};
+                var attKey = Object.keys(pri.attributes);
+                attKey.push('indices');
+                for (var k = 0; k < attKey.length; k++) {
+                    var bNum = pri.attributes[attKey[k]];
+                    if (attKey[k] == 'indices') {
+                        bNum = pri.indices;
+                    }
+                    var acs = data.accessors[bNum];
+                    var bv = data.bufferViews[acs.bufferView];
+                    var size = 0;
+                    switch (acs.type) {
+                        case 'SCALAR':
+                            size = 1;
+                            break;
+                        case 'VEC2':
+                            size = 2;
+                            break;
+                        case 'VEC3':
+                            size = 3;
+                            break;
+                    }
+                    var ArrayConstructor = void 0;
+                    switch (acs.componentType) {
+                        case 5126:
+                            ArrayConstructor = Float32Array;
+                            break;
+                        case 5123:
+                            ArrayConstructor = Int16Array;
+                            break;
+                    }
+                    attrs[attKey[k].toLocaleLowerCase()] = {
+                        size: size,
+                        array: new ArrayConstructor(buffer, bv.byteOffset, acs.count * size)
+                    };
+                }
+                result[m.name] = attrs;
+            }
+            if (callBack) {
+                callBack(result);
+            }
+        });
+    };
+    GLTFLoader.prototype.decodeURI = function (uri) {
+        var orgn = /^data:(.*?)(;base64)?,(.*)$/;
+        var data = uri.match(orgn);
+        var bdata = atob(data[3]);
+        var view = new Uint8Array(bdata.length);
+        for (var i = 0; i < bdata.length; i++) {
+            view[i] = bdata.charCodeAt(i);
+        }
+        return view.buffer;
+    };
+    return GLTFLoader;
+}());
+
+export { GLTFLoader, Mat4, Renderer, Vec2, Vec3 };

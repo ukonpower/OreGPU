@@ -330,9 +330,9 @@
             this.indexCount = this.index.length;
             var all = [];
             for (var i = 0; i < this.verticesCount; i++) {
-                all.push(position[i * 3 + 0], position[i * 3 + 1], position[i * 3 + 2]);
-                all.push(uv[i * 2 + 0], uv[i * 2 + 1]);
-                all.push(normal[i * 3 + 0], normal[i * 3 + 1], normal[i * 3 + 2]);
+                all.push(position[i * 3 + 0] || 0, position[i * 3 + 1] || 0, position[i * 3 + 2] || 0);
+                all.push(uv[i * 2 + 0] || 0, uv[i * 2 + 1] || 0);
+                all.push(normal[i * 3 + 0] || 0, normal[i * 3 + 1] || 0, normal[i * 3 + 2] || 0);
             }
             this.allAttributes = new Float32Array(all);
         }
@@ -612,6 +612,83 @@
         return Mat3;
     }());
 
+    var GLTFLoader = /** @class */ (function () {
+        function GLTFLoader() {
+        }
+        GLTFLoader.prototype.load = function (path, callBack) {
+            var _this = this;
+            var prm = new Promise(function (resolve) {
+                var request = new XMLHttpRequest();
+                request.open('GET', path, true);
+                request.send(null);
+                request.addEventListener('load', function (e) {
+                    var data = JSON.parse(request.response);
+                    var uri = data.buffers[0].uri;
+                    var buffer = _this.decodeURI(uri);
+                    var result = {};
+                    var nkey = Object.keys(data.nodes);
+                    for (var i = 0; i < nkey.length; i++) {
+                        var m = data.nodes[nkey[i]];
+                        var pri = data.meshes[m.mesh].primitives[0];
+                        var attrs = {};
+                        var attKey = Object.keys(pri.attributes);
+                        attKey.push('indices');
+                        for (var k = 0; k < attKey.length; k++) {
+                            var bNum = pri.attributes[attKey[k]];
+                            if (attKey[k] == 'indices') {
+                                bNum = pri.indices;
+                            }
+                            var acs = data.accessors[bNum];
+                            var bv = data.bufferViews[acs.bufferView];
+                            var size = 0;
+                            switch (acs.type) {
+                                case 'SCALAR':
+                                    size = 1;
+                                    break;
+                                case 'VEC2':
+                                    size = 2;
+                                    break;
+                                case 'VEC3':
+                                    size = 3;
+                                    break;
+                            }
+                            var ArrayConstructor = void 0;
+                            switch (acs.componentType) {
+                                case 5126:
+                                    ArrayConstructor = Float32Array;
+                                    break;
+                                case 5123:
+                                    ArrayConstructor = Int16Array;
+                                    break;
+                            }
+                            attrs[attKey[k].toLocaleLowerCase()] = {
+                                size: size,
+                                array: new ArrayConstructor(buffer, bv.byteOffset, acs.count * size)
+                            };
+                        }
+                        result[m.name] = attrs;
+                    }
+                    resolve(result);
+                    if (callBack) {
+                        callBack(result);
+                    }
+                });
+            });
+            return prm;
+        };
+        GLTFLoader.prototype.decodeURI = function (uri) {
+            var orgn = /^data:(.*?)(;base64)?,(.*)$/;
+            var data = uri.match(orgn);
+            var bdata = atob(data[3]);
+            var view = new Uint8Array(bdata.length);
+            for (var i = 0; i < bdata.length; i++) {
+                view[i] = bdata.charCodeAt(i);
+            }
+            return view.buffer;
+        };
+        return GLTFLoader;
+    }());
+
     var Renderer = /** @class */ (function () {
         function Renderer(canvas) {
             this.adapter = null;
@@ -625,16 +702,17 @@
             this.uniformBuffer = null;
             this.uniformBindGroup = null;
             this.time = 0;
+            this.geo = null;
             this.canvas = canvas;
             // matrix
-            this.projectionMatrix = new Mat4().perspective(90, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000);
-            this.viewMatrix = new Mat4().lookAt(new Vec3(1.0, 1.0, 2.0), new Vec3(0, 0, 0), new Vec3(0, 1, 0));
+            this.projectionMatrix = new Mat4().perspective(50, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000);
+            this.viewMatrix = new Mat4().lookAt(new Vec3(0.0, 0.8, 1.7), new Vec3(0, 0.4, 0), new Vec3(0, 1, 0));
             this.geo = new CubeGeometry();
             this.init();
         }
         Renderer.prototype.init = function () {
             return __awaiter(this, void 0, void 0, function () {
-                var _a, _b, presentationFormat, size;
+                var _a, _b, presentationFormat, size, loader, gltf, bunny;
                 return __generator(this, function (_c) {
                     switch (_c.label) {
                         case 0:
@@ -666,7 +744,14 @@
                                 format: presentationFormat,
                                 size: size
                             });
-                            // geometry
+                            loader = new GLTFLoader();
+                            return [4 /*yield*/, loader.load("./assets/models/bunny.gltf")];
+                        case 3:
+                            gltf = _c.sent();
+                            console.log();
+                            bunny = gltf['bun_zipper_res2'];
+                            this.geo = new Geometry(bunny.position.array, [], bunny.normal.array, bunny.indices.array);
+                            console.log(this.geo);
                             this.verticesBuffer = this.device.createBuffer({
                                 size: this.geo.allAttributes.byteLength,
                                 usage: GPUBufferUsage.VERTEX,
@@ -766,7 +851,7 @@
             }
             // set uniforms
             if (this.uniformBuffer) {
-                var modelMatrix = new Mat4().makeTransform(new Vec3(), new Vec3(this.time * 0.1, this.time * 0.2, 0));
+                var modelMatrix = new Mat4().makeTransform(new Vec3(), new Vec3(0.0, this.time * 0.1, 0));
                 var mvMatrix = this.viewMatrix.clone().multiply(modelMatrix);
                 var normalMatrix = new Mat3().copy(mvMatrix);
                 normalMatrix.inverse().transpose();
@@ -803,11 +888,11 @@
             if (this.uniformBindGroup) {
                 passEncoder.setBindGroup(0, this.uniformBindGroup);
             }
-            if (this.verticesBuffer && this.indexBuffer) {
+            if (this.geo && this.verticesBuffer && this.indexBuffer) {
                 passEncoder.setVertexBuffer(0, this.verticesBuffer);
                 passEncoder.setIndexBuffer(this.indexBuffer, 'uint16');
+                passEncoder.drawIndexed(this.geo.indexCount);
             }
-            passEncoder.drawIndexed(this.geo.indexCount);
             passEncoder.endPass();
             this.device.queue.submit([commandEncoder.finish()]);
             requestAnimationFrame(this.render.bind(this));
@@ -875,6 +960,7 @@
         return Vec2;
     }());
 
+    exports.GLTFLoader = GLTFLoader;
     exports.Mat4 = Mat4;
     exports.Renderer = Renderer;
     exports.Vec2 = Vec2;

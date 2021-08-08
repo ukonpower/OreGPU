@@ -6,6 +6,7 @@ import { Geometry } from '../geometries/Geometry';
 import { CubeGeometry } from '../geometries/CubeGeometry';
 import { SphereGeometry } from '../geometries/SphereGeometry';
 import { Mat3 } from '../math/Mat3';
+import { GLTFLoader } from '../loaders/GLTFLoader';
 
 export class Renderer {
 
@@ -32,15 +33,15 @@ export class Renderer {
 
 	private time: number = 0;
 
-	private geo: Geometry;
+	private geo: Geometry | null = null;
 
 	constructor( canvas: HTMLCanvasElement ) {
 
 		this.canvas = canvas;
 
 		// matrix
-		this.projectionMatrix = new Mat4().perspective( 90, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000 );
-		this.viewMatrix = new Mat4().lookAt( new Vec3( 1.0, 1.0, 2.0 ), new Vec3( 0, 0, 0 ), new Vec3( 0, 1, 0 ) );
+		this.projectionMatrix = new Mat4().perspective( 50, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000 );
+		this.viewMatrix = new Mat4().lookAt( new Vec3( 0.0, 0.8, 1.7 ), new Vec3( 0, 0.4, 0 ), new Vec3( 0, 1, 0 ) );
 
 		this.geo = new CubeGeometry();
 
@@ -88,6 +89,17 @@ export class Renderer {
 		} );
 
 		// geometry
+
+		let loader = new GLTFLoader();
+		let gltf = await loader.load( "./assets/models/bunny.gltf" );
+
+		console.log( );
+
+		let bunny = gltf[ 'bun_zipper_res2' ];
+
+		this.geo = new Geometry( bunny.position.array, [], bunny.normal.array, bunny.indices.array );
+
+		console.log( this.geo );
 
 		this.verticesBuffer = this.device.createBuffer( {
 			size: this.geo.allAttributes.byteLength,
@@ -203,7 +215,7 @@ export class Renderer {
 
 		if ( this.uniformBuffer ) {
 
-			let modelMatrix = new Mat4().makeTransform( new Vec3(), new Vec3( this.time * 0.1, this.time * 0.2, 0, ) );
+			let modelMatrix = new Mat4().makeTransform( new Vec3(), new Vec3( 0.0, this.time * 0.1, 0, ) );
 			let mvMatrix = this.viewMatrix.clone().multiply( modelMatrix );
 
 			let normalMatrix = new Mat3().copy( mvMatrix );
@@ -255,14 +267,14 @@ export class Renderer {
 
 		}
 
-		if ( this.verticesBuffer && this.indexBuffer ) {
+		if ( this.geo && this.verticesBuffer && this.indexBuffer ) {
 
 			passEncoder.setVertexBuffer( 0, this.verticesBuffer );
 			passEncoder.setIndexBuffer( this.indexBuffer, 'uint16' );
+			passEncoder.drawIndexed( this.geo.indexCount );
 
 		}
 
-		passEncoder.drawIndexed( this.geo.indexCount );
 
 		passEncoder.endPass();
 

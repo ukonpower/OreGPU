@@ -43,9 +43,9 @@ export class Geometry {
 
 		for ( let i = 0; i < this.verticesCount; i ++ ) {
 
-			all.push( position[ i * 3 + 0 ], position[ i * 3 + 1 ], position[ i * 3 + 2 ] );
-			all.push( uv[ i * 2 + 0 ], uv[ i * 2 + 1 ] );
-			all.push( normal[ i * 3 + 0 ], normal[ i * 3 + 1 ], normal[ i * 3 + 2 ] );
+			all.push( position[ i * 3 + 0 ] || 0, position[ i * 3 + 1 ] || 0, position[ i * 3 + 2 ] || 0 );
+			all.push( uv[ i * 2 + 0 ] || 0, uv[ i * 2 + 1 ] || 0 );
+			all.push( normal[ i * 3 + 0 ] || 0, normal[ i * 3 + 1 ] || 0, normal[ i * 3 + 2 ] || 0 );
 
 		}
 
