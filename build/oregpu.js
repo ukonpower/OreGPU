@@ -18,6 +18,22 @@
     OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
     PERFORMANCE OF THIS SOFTWARE.
     ***************************************************************************** */
+    /* global Reflect, Promise */
+
+    var extendStatics = function(d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
+
+    function __extends(d, b) {
+        if (typeof b !== "function" && b !== null)
+            throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    }
 
     function __awaiter(thisArg, _arguments, P, generator) {
         function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -57,9 +73,19 @@
         }
     }
 
-    var sampleVert = "[[block]] struct Uniforms {\r\n  mvMatrix : mat4x4<f32>;\r\n  projectionMatrix : mat4x4<f32>;\r\n};\r\n[[binding(0), group(0)]] var<uniform> uniforms : Uniforms;\r\n\r\nstruct VertexOutput {\r\n  [[builtin(position)]] Position : vec4<f32>;\r\n  [[location(0)]] col : vec3<f32>;\r\n};\r\n\r\n[[stage(vertex)]]\r\nfn main([[location(0)]] position : vec3<f32> ) -> VertexOutput {\r\n\r\n\tvar output: VertexOutput;\r\n\r\n\tvar mvPosition: vec4<f32> = uniforms.mvMatrix * vec4<f32>( position, 1.0 );\r\n\toutput.Position = uniforms.projectionMatrix * mvPosition;\r\n\toutput.col = position + vec3<f32>( 0.0, 0.0, 1.0 );\r\n\r\n\treturn output;\r\n}\r\n";
+    function __spreadArray(to, from, pack) {
+        if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+            if (ar || !(i in from)) {
+                if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+                ar[i] = from[i];
+            }
+        }
+        return to.concat(ar || from);
+    }
 
-    var sampleFrag = "[[stage(fragment)]]\r\nfn main([[location(0)]] col: vec3<f32>) -> [[location(0)]] vec4<f32> {\r\n\treturn vec4<f32>(col, 1.0);\r\n}";
+    var sampleVert = "[[block]] struct Uniforms {\r\n  mvMatrix : mat4x4<f32>;\r\n  projectionMatrix : mat4x4<f32>;\r\n  normalMatrix:  mat3x3<f32>;\r\n};\r\n[[binding(0), group(0)]] var<uniform> uniforms : Uniforms;\r\n\r\nstruct VertexOutput {\r\n  [[builtin(position)]] Position : vec4<f32>;\r\n  [[location(0)]] col : vec3<f32>;\r\n  [[location(1)]] normal : vec3<f32>;\r\n};\r\n\r\n[[stage(vertex)]]\r\nfn main([[location(0)]] position : vec3<f32>, [[location(1)]] uv : vec2<f32>, [[location(2)]] normal : vec3<f32> ) -> VertexOutput {\r\n\r\n\tvar output: VertexOutput;\r\n\r\n\tvar mvPosition: vec4<f32> = uniforms.mvMatrix * vec4<f32>( position, 1.0 );\r\n\toutput.Position = uniforms.projectionMatrix * mvPosition;\r\n\toutput.col = position + vec3<f32>( 0.0, 0.0, 1.0 );\r\n\toutput.normal = normalize(normal * uniforms.normalMatrix);\r\n\r\n\treturn output;\r\n}\r\n";
+
+    var sampleFrag = "[[stage(fragment)]]\r\nfn main([[location(0)]] col: vec3<f32>, [[location(1)]] normal: vec3<f32>) -> [[location(0)]] vec4<f32> {\r\n\r\n\tvar s: f32 = dot( normalize(normal), vec3<f32>( 1.0, 1.0, 1.0 ) );\r\n\tvar c: vec3<f32> = vec3<f32>( max( 0.0,s ) + 0.4);\r\n\treturn vec4<f32>((normal * 0.5 + 0.5), 1.0);\r\n}";
 
     var Mat4 = /** @class */ (function () {
         function Mat4() {
@@ -304,26 +330,327 @@
         return Vec3;
     }());
 
+    var Geometry = /** @class */ (function () {
+        function Geometry(position, uv, normal, index) {
+            this.position = new Float32Array(position);
+            this.uv = new Float32Array(uv);
+            this.normal = new Float32Array(normal);
+            this.index = new Uint16Array(index);
+            this.arrays = {
+                position: position,
+                uv: uv,
+                normal: normal,
+                index: index
+            };
+            this.verticesCount = this.position.length / 3;
+            this.indexCount = this.index.length;
+            var all = [];
+            for (var i = 0; i < this.verticesCount; i++) {
+                all.push(position[i * 3 + 0], position[i * 3 + 1], position[i * 3 + 2]);
+                all.push(uv[i * 2 + 0], uv[i * 2 + 1]);
+                all.push(normal[i * 3 + 0], normal[i * 3 + 1], normal[i * 3 + 2]);
+            }
+            this.allAttributes = new Float32Array(all);
+        }
+        return Geometry;
+    }());
+
+    var CubeGeometry = /** @class */ (function (_super) {
+        __extends(CubeGeometry, _super);
+        function CubeGeometry(width, height, depth) {
+            if (width === void 0) { width = 1; }
+            if (height === void 0) { height = 1; }
+            if (depth === void 0) { depth = 1; }
+            var _this = this;
+            var hx = width / 2;
+            var hy = height / 2;
+            var hz = depth / 2;
+            var p = [
+                -hx, hy, hz,
+                hx, hy, hz,
+                -hx, -hy, hz,
+                hx, -hy, hz,
+                hx, hy, -hz,
+                -hx, hy, -hz,
+                hx, -hy, -hz,
+                -hx, -hy, -hz,
+                hx, hy, hz,
+                hx, hy, -hz,
+                hx, -hy, hz,
+                hx, -hy, -hz,
+                -hx, hy, -hz,
+                -hx, hy, hz,
+                -hx, -hy, -hz,
+                -hx, -hy, hz,
+                hx, hy, -hz,
+                hx, hy, hz,
+                -hx, hy, -hz,
+                -hx, hy, hz,
+                -hx, -hy, -hz,
+                -hx, -hy, hz,
+                hx, -hy, -hz,
+                hx, -hy, hz,
+            ];
+            var n = [
+                0, 0, 1,
+                0, 0, 1,
+                0, 0, 1,
+                0, 0, 1,
+                0, 0, -1,
+                0, 0, -1,
+                0, 0, -1,
+                0, 0, -1,
+                1, 0, 0,
+                1, 0, 0,
+                1, 0, 0,
+                1, 0, 0,
+                -1, 0, 0,
+                -1, 0, 0,
+                -1, 0, 0,
+                -1, 0, 0,
+                0, 1, 0,
+                0, 1, 0,
+                0, 1, 0,
+                0, 1, 0,
+                0, -1, 0,
+                0, -1, 0,
+                0, -1, 0,
+                0, -1, 0,
+            ];
+            var u = [];
+            var index = [];
+            for (var i = 0; i < 6; i++) {
+                u.push(0, 1, 1, 1, 0, 0, 1, 0);
+                var offset = 4 * i;
+                index.push(0 + offset, 2 + offset, 1 + offset, 1 + offset, 2 + offset, 3 + offset);
+            }
+            _this = _super.call(this, p, u, n, index) || this;
+            return _this;
+        }
+        return CubeGeometry;
+    }(Geometry));
+
+    var Mat3 = /** @class */ (function () {
+        function Mat3() {
+            this.elm = [];
+            this.identity();
+        }
+        Object.defineProperty(Mat3.prototype, "isMat3", {
+            get: function () {
+                return true;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        Mat3.prototype.identity = function () {
+            this.elm = [
+                1, 0, 0,
+                0, 1, 0,
+                0, 0, 1,
+            ];
+            return this;
+        };
+        Mat3.prototype.set = function (a, b, c, d, e, f, g, h, i) {
+            if (a === void 0) { a = 0; }
+            if (b === void 0) { b = 0; }
+            if (c === void 0) { c = 0; }
+            if (d === void 0) { d = 0; }
+            if (e === void 0) { e = 0; }
+            if (f === void 0) { f = 0; }
+            if (g === void 0) { g = 0; }
+            if (h === void 0) { h = 0; }
+            if (i === void 0) { i = 0; }
+            this.elm = [
+                a, d, g,
+                b, e, h,
+                c, f, i
+            ];
+        };
+        Mat3.prototype.clone = function () {
+            return new Mat3().copy(this);
+        };
+        Mat3.prototype.copy = function (mat) {
+            if ('isMat3' in mat) {
+                this.elm = mat.elm.slice();
+            }
+            if ('isMat4' in mat) {
+                this.set(mat.elm[0], mat.elm[4], mat.elm[7], mat.elm[1], mat.elm[5], mat.elm[8], mat.elm[2], mat.elm[6], mat.elm[9]);
+            }
+            return this;
+        };
+        Mat3.prototype.inverse = function () {
+            var a11 = this.elm[0];
+            var a12 = this.elm[3];
+            var a13 = this.elm[6];
+            var a21 = this.elm[1];
+            var a22 = this.elm[4];
+            var a23 = this.elm[7];
+            var a31 = this.elm[2];
+            var a32 = this.elm[5];
+            var a33 = this.elm[8];
+            var det = a11 * a22 * a33 + a12 * a23 * a31 + a13 * a21 * a32 -
+                a13 * a22 * a31 - a12 * a21 * a33 - a11 * a23 * a32;
+            if (det == 0) {
+                this.identity();
+                return this;
+            }
+            var detInv = 1.0 / det;
+            this.elm[0] = (a22 * a33 - a23 * a32) * detInv;
+            this.elm[3] = -(a12 * a33 - a13 * a32) * detInv;
+            this.elm[6] = (a12 * a23 - a13 * a22) * detInv;
+            this.elm[1] = -(a21 * a33 - a23 * a31) * detInv;
+            this.elm[4] = (a11 * a33 - a13 * a31) * detInv;
+            this.elm[7] = -(a11 * a23 - a13 * a21) * detInv;
+            this.elm[2] = (a21 * a32 - a22 * a31) * detInv;
+            this.elm[5] = -(a11 * a32 - a12 * a31) * detInv;
+            this.elm[8] = (a11 * a22 - a12 * a21) * detInv;
+            return this;
+        };
+        Mat3.prototype.transpose = function () {
+            var a = __spreadArray([], this.elm);
+            this.elm[0] = a[0];
+            this.elm[3] = a[1];
+            this.elm[6] = a[2];
+            this.elm[1] = a[3];
+            this.elm[4] = a[4];
+            this.elm[7] = a[5];
+            this.elm[2] = a[6];
+            this.elm[5] = a[7];
+            this.elm[8] = a[8];
+            return this;
+        };
+        Mat3.prototype.mul = function (elm2) {
+            var dist = new Array(9);
+            for (var i = 0; i < 3; i++) {
+                for (var j = 0; j < 3; j++) {
+                    var sum = 0;
+                    for (var k = 0; k < 3; k++) {
+                        sum += this.elm[k * 3 + j] * elm2[k + i * 3];
+                    }
+                    dist[j + i * 3] = sum;
+                }
+            }
+            this.elm = dist;
+        };
+        Mat3.prototype.multiply = function (m) {
+            this.mul(m.elm);
+            return this;
+        };
+        Mat3.prototype.multiplyScaler = function (a) {
+            for (var i = 0; i < this.elm.length; i++) {
+                this.elm[i] *= a;
+            }
+            return this;
+        };
+        Mat3.prototype.makePosition = function (position) {
+            this.elm = [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                position.x, position.y, position.z, 1
+            ];
+            return this;
+        };
+        Mat3.prototype.makeRotation = function (rotation) {
+            var m = new Mat3();
+            var c = Math.cos(rotation.x), s = Math.sin(rotation.x);
+            m.mul([
+                1, 0, 0, 0,
+                0, c, s, 0,
+                0, -s, c, 0,
+                0, 0, 0, 1
+            ]);
+            c = Math.cos(rotation.y), s = Math.sin(rotation.y);
+            m.mul([
+                c, 0, -s, 0,
+                0, 1, 0, 0,
+                s, 0, c, 0,
+                0, 0, 0, 1
+            ]);
+            c = Math.cos(rotation.z), s = Math.sin(rotation.z);
+            m.mul([
+                c, s, 0, 0,
+                -s, c, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            ]);
+            this.elm = m.elm;
+            return this;
+        };
+        Mat3.prototype.makeScale = function (scale) {
+            this.elm = [
+                scale.x, 0, 0, 0,
+                0, scale.y, 0, 0,
+                0, 0, scale.z, 0,
+                0, 0, 0, 1
+            ];
+            return this;
+        };
+        Mat3.prototype.makeTransform = function (position, rotation, scale) {
+            this.identity();
+            if (position) {
+                this.multiply(new Mat3().makePosition(position));
+            }
+            if (rotation) {
+                this.multiply(new Mat3().makeRotation(rotation));
+            }
+            if (scale) {
+                this.multiply(new Mat3().makeScale(scale));
+            }
+            return this;
+        };
+        Mat3.prototype.perspective = function (fov, aspect, near, far) {
+            var r = 1 / Math.tan(fov * Math.PI / 360);
+            var d = far - near;
+            this.elm = [
+                r / aspect, 0, 0, 0,
+                0, r, 0, 0,
+                0, 0, -(far + near) / d, -1,
+                0, 0, -(far * near * 2) / d, 0
+            ];
+            return this;
+        };
+        Mat3.prototype.lookAt = function (eye, target, up) {
+            var zAxis = eye.clone().sub(target).normalize();
+            var xAxis = up.clone().cross(zAxis).normalize();
+            var yAxis = zAxis.clone().cross(xAxis).normalize();
+            this.elm = [
+                xAxis.x, yAxis.x, zAxis.x, 0,
+                xAxis.y, yAxis.y, zAxis.y, 0,
+                xAxis.z, yAxis.z, zAxis.z, 0,
+                -eye.dot(xAxis),
+                -eye.dot(yAxis),
+                -eye.dot(zAxis),
+                1,
+            ];
+            return this;
+        };
+        return Mat3;
+    }());
+
     var Renderer = /** @class */ (function () {
         function Renderer(canvas) {
             this.adapter = null;
             this.device = null;
             this.context = null;
             this.pipeline = null;
+            this.depthTexture = null;
             this.renderPassDescripter = null;
             this.verticesBuffer = null;
+            this.indexBuffer = null;
             this.uniformBuffer = null;
             this.uniformBindGroup = null;
             this.time = 0;
             this.canvas = canvas;
             // matrix
             this.projectionMatrix = new Mat4().perspective(50, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000);
-            this.viewMatrix = new Mat4().makeTransform(new Vec3(0.0, 0.0, -5.0));
+            this.viewMatrix = new Mat4().makeTransform(new Vec3(0.0, 0.0, 5.0));
+            this.geo = new CubeGeometry();
             this.init();
         }
         Renderer.prototype.init = function () {
             return __awaiter(this, void 0, void 0, function () {
-                var _a, _b, presentationFormat, size, cubeArray;
+                var _a, _b, presentationFormat, size;
                 return __generator(this, function (_c) {
                     switch (_c.label) {
                         case 0:
@@ -355,21 +682,21 @@
                                 format: presentationFormat,
                                 size: size
                             });
-                            cubeArray = new Float32Array([
-                                -1, 1, 0, 1,
-                                1, 1, 0, 1,
-                                1, -1, 0, 1,
-                                1, -1, 0, 1,
-                                -1, -1, 0, 1,
-                                -1, 1, 0, 1,
-                            ]);
+                            // geometry
                             this.verticesBuffer = this.device.createBuffer({
-                                size: cubeArray.byteLength,
+                                size: this.geo.allAttributes.byteLength,
                                 usage: GPUBufferUsage.VERTEX,
                                 mappedAtCreation: true
                             });
-                            new Float32Array(this.verticesBuffer.getMappedRange()).set(cubeArray);
+                            new Float32Array(this.verticesBuffer.getMappedRange()).set(this.geo.allAttributes);
                             this.verticesBuffer.unmap();
+                            this.indexBuffer = this.device.createBuffer({
+                                size: this.geo.index.byteLength,
+                                usage: GPUBufferUsage.INDEX,
+                                mappedAtCreation: true,
+                            });
+                            new Uint16Array(this.indexBuffer.getMappedRange()).set(this.geo.index);
+                            this.indexBuffer.unmap();
                             // renderpipeline
                             this.pipeline = this.device.createRenderPipeline({
                                 vertex: {
@@ -379,12 +706,24 @@
                                     entryPoint: 'main',
                                     buffers: [
                                         {
-                                            arrayStride: 4 * 4,
-                                            attributes: [{
+                                            arrayStride: 8 * 4,
+                                            attributes: [
+                                                {
                                                     shaderLocation: 0,
                                                     offset: 0,
-                                                    format: 'float32x4',
-                                                }]
+                                                    format: 'float32x3',
+                                                },
+                                                {
+                                                    shaderLocation: 1,
+                                                    offset: Float32Array.BYTES_PER_ELEMENT * 3,
+                                                    format: 'float32x2',
+                                                },
+                                                {
+                                                    shaderLocation: 2,
+                                                    offset: Float32Array.BYTES_PER_ELEMENT * 5,
+                                                    format: 'float32x3',
+                                                }
+                                            ]
                                         }
                                     ],
                                 },
@@ -403,10 +742,20 @@
                                     topology: "triangle-list",
                                     cullMode: 'none'
                                 },
+                                depthStencil: {
+                                    depthWriteEnabled: true,
+                                    depthCompare: 'less',
+                                    format: 'depth24plus'
+                                }
+                            });
+                            this.depthTexture = this.device.createTexture({
+                                size: size,
+                                format: 'depth24plus',
+                                usage: GPUTextureUsage.RENDER_ATTACHMENT
                             });
                             // uniforms
                             this.uniformBuffer = this.device.createBuffer({
-                                size: 4 * 16 * 2,
+                                size: ((4 * 4) * 2 + 12 * 1) * Float32Array.BYTES_PER_ELEMENT,
                                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
                             });
                             this.uniformBindGroup = this.device.createBindGroup({
@@ -434,12 +783,16 @@
             // set uniforms
             if (this.uniformBuffer) {
                 var modelMatrix = new Mat4().makeRotation(new Vec3(0.0, this.time * 0.1, 0.0));
-                var mvMatrix = this.viewMatrix.clone().multiply(modelMatrix);
-                var uniformData = new Float32Array(new Array().concat(mvMatrix.elm, this.projectionMatrix.elm));
+                var mvMatrix = this.viewMatrix.clone().inverse().multiply(modelMatrix);
+                var normalMatrix = new Mat3().copy(mvMatrix);
+                normalMatrix.inverse().transpose();
+                var uniformData = new Float32Array(new Array().concat(mvMatrix.elm, this.projectionMatrix.elm, normalMatrix.elm));
                 this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData.buffer, uniformData.byteOffset, uniformData.byteLength);
             }
             var commandEncoder = this.device.createCommandEncoder();
             var textureView = this.context.getCurrentTexture().createView();
+            if (!(this.pipeline && this.depthTexture))
+                return;
             this.renderPassDescripter = {
                 colorAttachments: [
                     {
@@ -447,21 +800,27 @@
                         loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
                         storeOp: 'store',
                     },
-                ]
+                ],
+                depthStencilAttachment: {
+                    view: this.depthTexture.createView(),
+                    depthLoadValue: 1.0,
+                    depthStoreOp: 'store',
+                    stencilLoadValue: 0.0,
+                    stencilStoreOp: 'store'
+                }
             };
             var passEncoder = commandEncoder.beginRenderPass(this.renderPassDescripter);
-            if (this.pipeline) {
-                passEncoder.setPipeline(this.pipeline);
-                if (this.uniformBindGroup) {
-                    passEncoder.setBindGroup(0, this.uniformBindGroup);
-                }
-                if (this.verticesBuffer) {
-                    passEncoder.setVertexBuffer(0, this.verticesBuffer);
-                }
-                passEncoder.draw(6, 1, 0, 0);
-                passEncoder.endPass();
-                this.device.queue.submit([commandEncoder.finish()]);
+            passEncoder.setPipeline(this.pipeline);
+            if (this.uniformBindGroup) {
+                passEncoder.setBindGroup(0, this.uniformBindGroup);
             }
+            if (this.verticesBuffer && this.indexBuffer) {
+                passEncoder.setVertexBuffer(0, this.verticesBuffer);
+                passEncoder.setIndexBuffer(this.indexBuffer, 'uint16');
+            }
+            passEncoder.drawIndexed(this.geo.indexCount);
+            passEncoder.endPass();
+            this.device.queue.submit([commandEncoder.finish()]);
             requestAnimationFrame(this.render.bind(this));
         };
         return Renderer;
