@@ -39,8 +39,8 @@ export class Renderer {
 		this.canvas = canvas;
 
 		// matrix
-		this.projectionMatrix = new Mat4().perspective( 50, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000 );
-		this.viewMatrix = new Mat4().makeTransform( new Vec3( 0.0, 0.0, 5.0 ) );
+		this.projectionMatrix = new Mat4().perspective( 90, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000 );
+		this.viewMatrix = new Mat4().lookAt( new Vec3( 1.0, 1.0, 2.0 ), new Vec3( 0, 0, 0 ), new Vec3( 0, 1, 0 ) );
 
 		this.geo = new CubeGeometry();
 
@@ -203,13 +203,21 @@ export class Renderer {
 
 		if ( this.uniformBuffer ) {
 
-			let modelMatrix = new Mat4().makeRotation( new Vec3( 0.0, this.time * 0.1, 0.0 ) );
-			let mvMatrix = this.viewMatrix.clone().inverse().multiply( modelMatrix );
+			let modelMatrix = new Mat4().makeTransform( new Vec3(), new Vec3( this.time * 0.1, this.time * 0.2, 0, ) );
+			let mvMatrix = this.viewMatrix.clone().multiply( modelMatrix );
 
 			let normalMatrix = new Mat3().copy( mvMatrix );
+
 			normalMatrix.inverse().transpose();
 
-			let uniformData = new Float32Array( new Array<number>().concat( mvMatrix.elm, this.projectionMatrix.elm, normalMatrix.elm ) );
+			let e = [
+				normalMatrix.elm[ 0 ], normalMatrix.elm[ 3 ], normalMatrix.elm[ 6 ], 0,
+				normalMatrix.elm[ 1 ], normalMatrix.elm[ 4 ], normalMatrix.elm[ 7 ], 0,
+				normalMatrix.elm[ 2 ], normalMatrix.elm[ 5 ], normalMatrix.elm[ 8 ], 0,
+			];
+
+
+			let uniformData = new Float32Array( new Array<number>().concat( mvMatrix.elm, this.projectionMatrix.elm, e ) );
 
 			this.device.queue.writeBuffer( this.uniformBuffer, 0, uniformData.buffer, uniformData.byteOffset, uniformData.byteLength );
 

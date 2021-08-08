@@ -37,6 +37,8 @@ export class Mat3 {
 			c, f, i
 		];
 
+		return this;
+
 	}
 
 	public clone() {
@@ -60,9 +62,9 @@ export class Mat3 {
 		if ( 'isMat4' in mat ) {
 
 			this.set(
-				mat.elm[ 0 ], mat.elm[ 4 ], mat.elm[ 7 ],
-				mat.elm[ 1 ], mat.elm[ 5 ], mat.elm[ 8 ],
-				mat.elm[ 2 ], mat.elm[ 6 ], mat.elm[ 9 ]
+				mat.elm[ 0 ], mat.elm[ 4 ], mat.elm[ 8 ],
+				mat.elm[ 1 ], mat.elm[ 5 ], mat.elm[ 9 ],
+				mat.elm[ 2 ], mat.elm[ 6 ], mat.elm[ 10 ]
 			);
 
 		}
@@ -88,8 +90,7 @@ export class Mat3 {
 
 		if ( det == 0 ) {
 
-			this.identity();
-			return this;
+			return this.set( 0, 0, 0, 0, 0, 0, 0, 0, 0 );
 
 		}
 
@@ -111,7 +112,7 @@ export class Mat3 {
 
 	public transpose() {
 
-		let a = [ ...this.elm ];
+		let a = this.elm.slice();
 
 		this.elm[ 0 ] = a[ 0 ];
 		this.elm[ 3 ] = a[ 1 ];

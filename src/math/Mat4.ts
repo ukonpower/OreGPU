@@ -191,23 +191,11 @@ export class Mat4 {
 
 		this.identity();
 
-		if ( position ) {
+		this.multiply( new Mat4().makePosition( position || new Vec3( 0.0, 0.0, 0.0 ) ) );
 
-			this.multiply( new Mat4().makePosition( position ) );
+		this.multiply( new Mat4().makeRotation( rotation || new Vec3( 0.0, 0.0, 0.0 ) ) );
 
-		}
-
-		if ( rotation ) {
-
-			this.multiply( new Mat4().makeRotation( rotation ) );
-
-		}
-
-		if ( scale ) {
-
-			this.multiply( new Mat4().makeScale( scale ) );
-
-		}
+		this.multiply( new Mat4().makeScale( scale || new Vec3( 1.0, 1.0, 1.0 ) ) );
 
 		return this;
 

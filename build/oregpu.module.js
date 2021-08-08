@@ -464,7 +464,12 @@ var Mat3 = /** @class */ (function () {
         return new Mat3().copy(this);
     };
     Mat3.prototype.copy = function (mat) {
-        this.elm = mat.elm.slice();
+        if ('isMat3' in mat) {
+            this.elm = mat.elm.slice();
+        }
+        if ('isMat4' in mat) {
+            this.set(mat.elm[0], mat.elm[4], mat.elm[7], mat.elm[1], mat.elm[5], mat.elm[8], mat.elm[2], mat.elm[6], mat.elm[9]);
+        }
         return this;
     };
     Mat3.prototype.inverse = function () {
@@ -773,19 +778,7 @@ var Renderer = /** @class */ (function () {
         if (this.uniformBuffer) {
             var modelMatrix = new Mat4().makeRotation(new Vec3(0.0, this.time * 0.1, 0.0));
             var mvMatrix = this.viewMatrix.clone().inverse().multiply(modelMatrix);
-            var mve = __spreadArray([], mvMatrix.elm);
-            var elm = [
-                mve[0], mve[4], mve[8],
-                mve[1], mve[5], mve[9],
-                mve[2], mve[6], mve[10],
-            ];
-            // elm = [
-            // 	mve[ 0 ], mve[ 1 ], mve[ 2 ],
-            // 	mve[ 3 ], mve[ 4 ], mve[ 5 ],
-            // 	mve[ 6 ], mve[ 7 ], mve[ 8 ],
-            // ];
-            var normalMatrix = new Mat3();
-            normalMatrix.set(elm[0], elm[1], elm[2], elm[3], elm[4], elm[5], elm[6], elm[7], elm[8]);
+            var normalMatrix = new Mat3().copy(mvMatrix);
             normalMatrix.inverse().transpose();
             var uniformData = new Float32Array(new Array().concat(mvMatrix.elm, this.projectionMatrix.elm, normalMatrix.elm));
             this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData.buffer, uniformData.byteOffset, uniformData.byteLength);
